@@ -5,7 +5,6 @@ import pg from "pg";
 const app = express();
 const port = 3000;
 
-
 const db = new pg.Client({
   user: "valky_user",
   connectionString: process.env.DB_HOST,
@@ -255,4 +254,6 @@ app.post("/zamestnanci/staska", async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
+  console.log(process.env.DB_HOST);
+  console.log(process.env.DB_PASSWORD);
 });
