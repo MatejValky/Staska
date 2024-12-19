@@ -8,12 +8,12 @@ const port = 3000;
 
 const db = new pg.Client({
   user: "valky_user",
-  connectionString: process.env.connectionString,
+  connectionString: process.env.DB_HOST,
   database: "valky",
-  password: process.env.password,
+  password: process.env.DB_PASSWORD,
   port: "5432",
   ssl: {
-    rejectUnauthorized: false 
+    rejectUnauthorized: false
   }
 });
 db.connect();
@@ -65,6 +65,13 @@ app.post("/manager", async (req, res) => {
     const meno_managera =req.body.meno_managera;
     const heslo_managera =req.body.heslo_managera;
     try{
+        let vsetkyAuta = []
+        let datum = new Date();
+        let month = datum.getMonth() + 1;
+        console.log("month",month);
+
+
+        month = month < 10 ? '0' + month : month;
         let id_managera = await db.query("SELECT id_managera FROM managery WHERE managery.meno_managera= $1 AND managery.heslo_managera= $2 ",[meno_managera,heslo_managera]);
         id_managera=id_managera.rows[0].id_managera;
         let auta = await db.query("SELECT * FROM auta WHERE auta.id_managera= $1 ",[id_managera]);
@@ -75,16 +82,36 @@ app.post("/manager", async (req, res) => {
         }
 
         for (let i=0; i<id_auta.length;i++){
-            let staska = await db.query("SELECT * FROM cerpanie WHERE cerpanie.id_auta= $1 ",[id_auta[i]]);
-            staska = staska.rows;
-            let cerpanie
-            console.log(staska);
+            let spoluKilometre=0;
+            let spoluCerpanie=0;
+            /*let jednotliveAuta={
+                zaciatocnyStavKilometre:,
+                konecnyStavKilometre:,
+                spoluKilometre:,
+                zaciatocnyStavNadrze:,
+                konecnyStavNadrze:,
+                cerpanie:,
+                priemernaSpotreba:,
 
-            for(let j=0; j<staska.rows.length;j++){
+            }*/
+            let stasky = await db.query("SELECT * FROM cerpanie WHERE cerpanie.id_auta= $1 ",[id_auta[i]]);
+            stasky = stasky.rows;
+
+
+            for(let j=0; j<stasky.length;j++){
+                if(j>0){
+                    let kilometre=stasky[j].stav_kilometre-stasky[j-1].stav_kilometre;
+                    spoluKilometre+=kilometre;
+
+                }
+                spoluCerpanie+=stasky[j].tankovanie;
                 
-                console.log(staska.rows[j]);
-
+                console.log("staska",j,stasky[j]);
+                console.log("spoluKilometre",spoluKilometre);
+                console.log("spoluCerpanie",spoluCerpanie);
             }
+            let priemernaSpotreba=spoluKilometre/100/spoluCerpanie;
+            console.log("priemernaSpotreba",priemernaSpotreba);
 
         }
 
@@ -125,7 +152,7 @@ app.post("/manager/noveVozidlo", async (req, res) => {
     
 })
 
-app.post("/zamestnanci/login", async (req, res) => {
+/*app.post("/zamestnanci/login", async (req, res) => {
     const password = req.body.heslo_auta;
 
     const id_auta= await db.query(
@@ -150,21 +177,26 @@ app.post("/zamestnanci/login", async (req, res) => {
     }
 
     res.send(frontEndData);   
-});
+});*/
 app.post("/zamestnanci/staska", async (req, res) => {
-    const id_auta = req.body.id_auta;
+    const password = req.body.heslo_auta;
     const vodic = req.body.vodic;
     const stav_kilometre= req.body.stav_kilometre;
     const stav_nadrze= req.body.stav_nadrze;
     let tankovanie = req.body.tankovanie;
+    let id_auta= await db.query(
+        "SELECT id_auta FROM auta WHERE heslo_auta= $1 ",
+        [password]);
+    id_auta=id_auta.rows[0].id_auta;
     if(tankovanie==null){
         console.log("Nenastavene tankovanie");
         tankovanie=0;
     }
     try{
+ 
         const Zapisane= await db.query("SELECT stav_kilometre FROM cerpanie ORDER BY id DESC LIMIT 1 WHERE id_auta=$1",[id_auta]);
         const Zapisane_zaciatocne= await db.query("SELECT zaciatocny_stav_kilometre FROM auta WHERE id_auta=$1",[id_auta]);
-        
+
         if(Zapisane.rows[0].stav_kilometre>stav_kilometre){
             res.send({message:"Nespravne zadane PHM"});
         }
@@ -181,7 +213,7 @@ app.post("/zamestnanci/staska", async (req, res) => {
 
                 
             datum= `${year}-${month}-${day}`;
-
+            console.log("Zapisujem");
             try {
                 await db.query(
                     "INSERT INTO cerpanie (id_auta,vodic,stav_kilometre,stav_nadrze,datum,tankovanie) VALUES ($1, $2, $3, $4, $5, $6)",
