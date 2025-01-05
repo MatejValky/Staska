@@ -6,10 +6,10 @@ const app = express();
 const port = process.env.PORT || 4000;
 
 const db = new pg.Client({
-  user: "valky_user",
-  connectionString: process.env.DB_HOST,
-  database: "valky",
-  password: process.env.DB_PASSWORD,
+  user: process.env.DATABASE_USER,
+  connectionString: process.env.DATABASE_URL,
+  database: process.env.DATABASE,
+  password: process.env.DATABASE_PASSWORD,
   port: "5432",
   ssl: {
     rejectUnauthorized: false
@@ -73,7 +73,7 @@ app.post("/manager", async (req, res) => {
         month = month < 10 ? '0' + month : month;
         let id_managera = await db.query("SELECT id_managera FROM managery WHERE managery.meno_managera= $1 AND managery.heslo_managera= $2 ",[meno_managera,heslo_managera]);
         id_managera=id_managera.rows[0].id_managera;
-        let auta = await db.query("SELECT * FROM auta WHERE auta.id_managera= $1 ",[id_managera]);
+        let auta = await db.query("SELECT * FROM auta WHERE auta.id_managera= $1  ",[id_managera]);
 
         let id_auta =[]
         for(let i=0; i<auta.rows.length;i++){
@@ -81,19 +81,22 @@ app.post("/manager", async (req, res) => {
         }
 
         for (let i=0; i<id_auta.length;i++){
+            console.log("id_auta",id_auta[i]);  
             let spoluKilometre=0;
             let spoluCerpanie=0;
-            /*let jednotliveAuta={
-                zaciatocnyStavKilometre:,
-                konecnyStavKilometre:,
-                spoluKilometre:,
-                zaciatocnyStavNadrze:,
-                konecnyStavNadrze:,
-                cerpanie:,
-                priemernaSpotreba:,
 
-            }*/
-            let stasky = await db.query("SELECT * FROM cerpanie WHERE cerpanie.id_auta= $1 ",[id_auta[i]]);
+            let zaciatocnyStavKilometre =await db.query("SELECT stav_kilometre FROM cerpanie WHERE cerpanie.id_auta= $1 AND EXTRACT(MONTH FROM datum) = $2 AND EXTRACT(YEAR FROM datum) = $3 ORDER BY datum ASC LIMIT 1;",[id_auta[i],month,datum.getFullYear()]);
+            console.log("zaciatocnyStavKilometre",zaciatocnyStavKilometre);
+            zaciatocnyStavKilometre=zaciatocnyStavKilometre.rows[0].stav_kilometre
+            let konecnyStavKilometre =await db.query("SELECT stav_kilometre FROM cerpanie WHERE cerpanie.id_auta= $1 AND EXTRACT(MONTH FROM datum) = $2 AND EXTRACT(YEAR FROM datum) = $3 ORDER BY datum DESC LIMIT 1;",[id_auta[i],month,datum.getFullYear()]);
+            konecnyStavKilometre=konecnyStavKilometre.rows[0].stav_kilometre
+
+            let zaciatocnyStavNadrze =await db.query("SELECT stav_nadrze FROM cerpanie WHERE cerpanie.id_auta= $1 AND EXTRACT(MONTH FROM datum) = $2 AND EXTRACT(YEAR FROM datum) = $3 ORDER BY datum ASC LIMIT 1;",[id_auta[i],month,datum.getFullYear()]);
+            zaciatocnyStavNadrze=zaciatocnyStavNadrze.rows[0].stav_nadrze
+            let konecnyStavNadrze =await db.query("SELECT stav_nadrze FROM cerpanie WHERE cerpanie.id_auta= $1 AND EXTRACT(MONTH FROM datum) = $2 AND EXTRACT(YEAR FROM datum) = $3 ORDER BY datum DESC LIMIT 1;",[id_auta[i],month,datum.getFullYear()]);
+            konecnyStavNadrze=konecnyStavNadrze.rows[0].stav_nadrze
+
+            let stasky = await db.query("SELECT * FROM cerpanie WHERE cerpanie.id_auta= $1 AND EXTRACT(MONTH FROM datum) = $2 AND EXTRACT(YEAR FROM datum) = $3;",[id_auta[i],month,datum.getFullYear()]);
             stasky = stasky.rows;
 
 
@@ -111,7 +114,18 @@ app.post("/manager", async (req, res) => {
             }
             let priemernaSpotreba=spoluKilometre/100/spoluCerpanie;
             console.log("priemernaSpotreba",priemernaSpotreba);
+            let jednotliveAuta={
+                zaciatocnyStavKilometre: zaciatocnyStavKilometre,
+                konecnyStavKilometre:konecnyStavKilometre,
+                spoluKilometre: spoluKilometre,
+                zaciatocnyStavNadrze: zaciatocnyStavNadrze,
+                konecnyStavNadrze: konecnyStavNadrze,
+                cerpanie: spoluCerpanie,
+                priemernaSpotreba: priemernaSpotreba,
 
+            }
+            
+            console.log("jednotliveAuta",jednotliveAuta);
         }
 
     }catch(err){
@@ -151,32 +165,6 @@ app.post("/manager/noveVozidlo", async (req, res) => {
     
 })
 
-/*app.post("/zamestnanci/login", async (req, res) => {
-    const password = req.body.heslo_auta;
-
-    const id_auta= await db.query(
-        "SELECT id_auta FROM auta WHERE heslo_auta= $1 ",
-        [password]);
-    let manager = await db.query(
-        "SELECT meno_managera FROM auta JOIN managery ON auta.id_managera=managery.id_managera WHERE auta.heslo_auta= $1 ",
-        [password]);
-    let firma= await db.query(
-        "SELECT Meno_firmy FROM managery JOIN firmy ON managery.id_firmy=firmy.id_firmy WHERE meno_managera= $1 ",
-        [manager.rows[0].meno_managera]);
-    let primarnyVodic= await db.query(
-        "SELECT primarny_vodic FROM auta JOIN managery ON auta.id_managera=managery.id_managera WHERE auta.heslo_auta= $1 ",
-        [password]);
-
-    let frontEndData ={
-        idAuta: id_auta.rows[0].id_auta,
-        menoManagera: manager.rows[0].meno_managera,
-        menoFirmy: firma.rows[0].meno_firmy,
-        primarnyVodic: primarnyVodic.rows[0].primarny_vodic
-        
-    }
-
-    res.send(frontEndData);   
-});*/
 app.post("/zamestnanci/staska", async (req, res) => {
     const password = req.body.heslo_auta;
     const vodic = req.body.vodic;
